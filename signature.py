@@ -33,7 +33,7 @@ class App(QMainWindow):
             (pubkey, privkey) = rsa.newkeys(512)
             hash = sha3_224(file)
             content = hash.digest()
-            cipher = rsa.sign_hash(content, privkey, "SHA-224")
+            cipher = rsa.encrypt(content, pubkey)
             saveFile(str(cipher))
             d = QDialog()
             d.setWindowTitle("Done")

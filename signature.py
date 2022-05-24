@@ -3,7 +3,6 @@ import sys
 
 from hashlib import sha3_224
 import rsa
-import ast
 
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSlot, Qt
@@ -20,7 +19,7 @@ class App(QMainWindow):
         self.initUI()
     
     def initUI(self):
-        self.resize(300, 120)
+        self.resize(300, 140)
         qtRectangle = self.frameGeometry()
         centerPoint = QDesktopWidget().availableGeometry().center()
         qtRectangle.moveCenter(centerPoint)
@@ -34,29 +33,41 @@ class App(QMainWindow):
             hash = sha3_224(file)
             content = hash.digest()
             cipher = rsa.encrypt(content, pubkey)
-            saveFile(str(cipher))
+            saveFile(str(cipher), "Save signature")
+            #privkeySTR = str(privkey.save_pkcs1("PEM"))
+            privkeySTR = privkey.save_pkcs1().decode('utf-8')
+
+            def saveKey():
+                filename = QFileDialog.getSaveFileName(self, "Save file", "", "PEM")
+                f = open(filename[0], 'w')
+                f.write(privkeySTR)
+                f.close()
+
             d = QDialog()
             d.setWindowTitle("Done")
-            d.resize(300, 300)
+            d.resize(300, 340)
             txt = QTextEdit(d)
             txt.resize(280, 240)
             txt.move(10, 10)
             txt.setReadOnly(True)
-            txt.setText("Here is your private key. KEEP IT SAFE!\ns" + str(privkey.save_pkcs1("PEM")))
+            txt.setText("Here is your private key. KEEP IT SAFE!\ns" + privkeySTR)
             btn = QPushButton("Noted", d)
+            btn.setToolTip('Make sure, I will not show it again')
             btn.resize(200, 30)
             btn.move(50, 260)
             btn.clicked.connect(d.accept)
+            btn2 = QPushButton("Just save it", d)
+            btn2.setToolTip('NO! IT"S NOT SAFE!!!')
+            btn2.resize(200, 30)
+            btn2.move(50, 300)
+            btn2.clicked.connect(saveKey)
             d.exec_()
 
         def validate():
             file = str(openFile()).encode('utf-8')
-            signature = openFile()
-            key = openFile()
-            with key:
-                keydata = key.read()
-                privkey = rsa.PrivateKey.load_pkcs1(keydata, "PEM")
-            if(check(file, signature, privkey)):
+            signature = openFile("Open signature file")
+            key = openFilePrivKey()
+            if(check(file, signature, key)):
                 d2 = QDialog()
                 d2.setWindowTitle("I've checked it out")
                 d2.resize(200, 100)
@@ -78,21 +89,29 @@ class App(QMainWindow):
                 txt2.resize(180, 40)
                 txt2.move(10, 10)
                 txt2.setReadOnly(True)
-                txt2.setText("It doesn't lokk good")
+                txt2.setText("It doesn't look good")
                 btn2 = QPushButton("Oh no", d2)
                 btn2.resize(180, 30)
                 btn2.move(10, 60)
                 btn2.clicked.connect(d2.accept)
                 d2.exec_()
 
-        def openFile():
-            filename = QFileDialog.getOpenFileName(self,'Open File')
+        def openFile(desc="Open file"):
+            filename = QFileDialog.getOpenFileName(self, desc)
             if filename[0]:
                 f = open(filename[0],'r')
                 return f
 
-        def saveFile(content):
-            filename = QFileDialog.getSaveFileName(self, "Save file", "", ".SIGNATURE")
+        def openFilePrivKey():
+            filename = QFileDialog.getOpenFileName(self,'Open Private Key')
+            if filename[0]:
+                f = open(filename[0],'rb')
+                keydata = f.read()
+                privkey = rsa.PrivateKey.load_pkcs1(keydata)
+                return privkey
+
+        def saveFile(content, desc="Save file"):
+            filename = QFileDialog.getSaveFileName(self, desc, "", ".SIGNATURE")
             f = open(filename[0], 'w')
             f.write(content)
             f.close()
@@ -114,6 +133,12 @@ class App(QMainWindow):
         buttonOpenFile.resize(200, 30)
         buttonOpenFile.move(50, 60)
         buttonOpenFile.clicked.connect(validate)
+
+        buttonExit = QPushButton('Exit', self)
+        buttonExit.setToolTip('Do I need to explain this functionality?')
+        buttonExit.resize(200, 30)
+        buttonExit.move(50, 100)
+        buttonExit.clicked.connect(self.close)
 
         self.show()
 

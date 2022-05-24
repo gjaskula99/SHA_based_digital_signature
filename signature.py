@@ -2,7 +2,9 @@ from http.client import ACCEPTED
 import sys
 
 from hashlib import sha3_224
-import rsa
+from Crypto import Random
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
 
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSlot, Qt
@@ -29,17 +31,20 @@ class App(QMainWindow):
 
         def sign():
             file = str(openFile()).encode('utf-8')
-            (pubkey, privkey) = rsa.newkeys(512)
+            privkey = RSA.generate(2048, Random.new().read)
+            pubkey = privkey.publickey()
             hash = sha3_224(file)
             content = hash.digest()
-            cipher = rsa.encrypt(content, pubkey)
-            saveFile(str(cipher), "Save signature")
-            #privkeySTR = str(privkey.save_pkcs1("PEM"))
-            privkeySTR = privkey.save_pkcs1().decode('utf-8')
+            cipher = PKCS1_OAEP.new(pubkey)
+            M = cipher.encrypt(content)
+            print(hash.hexdigest())
+            print(M)
+            saveFileBin(M, "Save signature")
+            privkeySTR = privkey.export_key(format='PEM', passphrase=None, pkcs=1, protection=None, randfunc=None)
 
             def saveKey():
-                filename = QFileDialog.getSaveFileName(self, "Save file", "", "PEM")
-                f = open(filename[0], 'w')
+                filename = QFileDialog.getSaveFileName(self, "Save key file", "", ".PEM")
+                f = open(filename[0], 'wb')
                 f.write(privkeySTR)
                 f.close()
 
@@ -50,7 +55,7 @@ class App(QMainWindow):
             txt.resize(280, 240)
             txt.move(10, 10)
             txt.setReadOnly(True)
-            txt.setText("Here is your private key. KEEP IT SAFE!\ns" + privkeySTR)
+            txt.setText("Here is your private key. KEEP IT SAFE!\ns" + privkeySTR.decode("utf-8"))
             btn = QPushButton("Noted", d)
             btn.setToolTip('Make sure, I will not show it again')
             btn.resize(200, 30)
@@ -65,11 +70,11 @@ class App(QMainWindow):
 
         def validate():
             file = str(openFile()).encode('utf-8')
-            signature = openFile("Open signature file")
-            key = openFilePrivKey()
-            if(check(file, signature, key)):
+            signature = openFileBin("Open signature file").read()
+            privKey = openFileBin("Open key file").read()
+            if(check(file, signature, privKey)):
                 d2 = QDialog()
-                d2.setWindowTitle("I've checked it out")
+                d2.setWindowTitle("Checked")
                 d2.resize(200, 100)
                 txt2 = QTextEdit(d2)
                 txt2.resize(180, 40)
@@ -83,7 +88,7 @@ class App(QMainWindow):
                 d2.exec_()
             else:
                 d2 = QDialog()
-                d2.setWindowTitle("I've checked it out")
+                d2.setWindowTitle("Checked")
                 d2.resize(200, 100)
                 txt2 = QTextEdit(d2)
                 txt2.resize(180, 40)
@@ -102,13 +107,11 @@ class App(QMainWindow):
                 f = open(filename[0],'r')
                 return f
 
-        def openFilePrivKey():
-            filename = QFileDialog.getOpenFileName(self,'Open Private Key')
+        def openFileBin(desc="Open file"):
+            filename = QFileDialog.getOpenFileName(self, desc)
             if filename[0]:
                 f = open(filename[0],'rb')
-                keydata = f.read()
-                privkey = rsa.PrivateKey.load_pkcs1(keydata)
-                return privkey
+                return f
 
         def saveFile(content, desc="Save file"):
             filename = QFileDialog.getSaveFileName(self, desc, "", ".SIGNATURE")
@@ -116,10 +119,20 @@ class App(QMainWindow):
             f.write(content)
             f.close()
 
+        def saveFileBin(content, desc="Save file"):
+            filename = QFileDialog.getSaveFileName(self, desc, "", ".SIGNATURE")
+            f = open(filename[0], 'wb')
+            f.write(content)
+            f.close()
+
         def check(file, signature, key):
             hash = sha3_224(file)
-            computed = rsa.decrypt(signature, key)
-            if(hash == computed): return True
+            privKey = RSA.importKey(key)
+            cipher = PKCS1_OAEP.new(privKey)
+            computed = cipher.decrypt(signature)
+            print(hash.hexdigest())
+            print(computed)
+            if(hash.digest() == computed): return True
             return False
 
         buttonNewFile = QPushButton('Sign', self)

@@ -11,7 +11,7 @@ Options for both signing and validation are present in GUI menu.
 1. Select file you want to sign
 2. Wait for RSA keys and hash being computed
 3. Save signature file in choosen destination
-4. Program will output private key which can be copied or save directly to .PEM file. Private key is being shown only at this stage - THERE IS NO WAY TO RECOVER IT LATER
+4. Program will output public key which can be copied or save directly to .PEM file. Public key is being shown only at this stage - THERE IS NO WAY TO RECOVER IT LATER
 
 Secondary option prompts user for seed used to generate RSA keys.
 

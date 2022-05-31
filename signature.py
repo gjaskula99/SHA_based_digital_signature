@@ -126,7 +126,7 @@ class App(QMainWindow):
                 txt.resize(280, 240)
                 txt.move(10, 10)
                 txt.setReadOnly(True)
-                txt.setText("Here is your private key. KEEP IT SAFE!\n" + keySTR.decode("utf-8"))
+                txt.setText("Here is your key.\n" + keySTR.decode("utf-8"))
                 btn = QPushButton("Noted", d)
                 btn.setToolTip('Make sure, I will not show it again')
                 btn.resize(200, 30)

@@ -1,9 +1,9 @@
 import sys
 
-from hashlib import sha3_224
 from Crypto import Random
 from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Signature import pss
+from Crypto.Hash import SHA3_224
 
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from PyQt5.QtWidgets import QDesktopWidget, QPushButton, QFileDialog, QDialog, QTextEdit
@@ -17,7 +17,7 @@ class App(QMainWindow):
         self.initUI()
     
     def initUI(self):
-        self.resize(300, 140)
+        self.resize(300, 180)
         qtRectangle = self.frameGeometry()
         centerPoint = QDesktopWidget().availableGeometry().center()
         qtRectangle.moveCenter(centerPoint)
@@ -76,17 +76,14 @@ class App(QMainWindow):
 
         def check(file, signature, key):
             try:
-                hash = sha3_224(file)
-                privKey = RSA.importKey(key)
-                cipher = PKCS1_OAEP.new(privKey)
-                computed = cipher.decrypt(signature)
+                hash = SHA3_224.new(file)
                 print(hash.hexdigest())
-                print(computed)
+                verifier = pss.new(key)
+                verifier.verify(hash, signature)
+                return True
             except:
-                errorDialog()
+                errorDialog("Signature is not valid")
                 return False
-            if(hash.digest() == computed): return True
-            return False
 
         #Signing itself
         def sign():
@@ -97,27 +94,25 @@ class App(QMainWindow):
                 errorFlag = True
                 errorDialog("No file chosen for opening")
             if(not errorFlag):
-                privkey = RSA.generate(2048, Random.new().read)
-                pubkey = privkey.publickey()
-                hash = sha3_224(file)
-                content = hash.digest()
-                cipher = PKCS1_OAEP.new(pubkey)
-                M = cipher.encrypt(content)
+                keys = RSA.generate(2048, Random.new().read)
+                pubkey = keys.publickey()
+                hash = SHA3_224.new(file)
+                cipher = pss.new(keys).sign(hash)
                 print(hash.hexdigest())
-                print(M)
+                print(cipher)
                 try:
-                    saveFileBin(M, "Save signature")
+                    saveFileBin(cipher, "Save signature")
                 except:
                     errorFlag = True
                     errorDialog("File saving aborted by user")
-                privkeySTR = privkey.export_key(format='PEM', passphrase=None, pkcs=1, protection=None, randfunc=None)
+                keySTR = pubkey.export_key(format='PEM', passphrase=None, pkcs=1, protection=None, randfunc=None)
 
                 def saveKey():
                     filename = QFileDialog.getSaveFileName(self, "Save key file", "", ".PEM")
                     try:
                         if not filename[0]: raise IOError("No file selected")
                         f = open(filename[0], 'wb')
-                        f.write(privkeySTR)
+                        f.write(keySTR)
                         f.close()
                     except:
                         errorFlag = True
@@ -131,14 +126,75 @@ class App(QMainWindow):
                 txt.resize(280, 240)
                 txt.move(10, 10)
                 txt.setReadOnly(True)
-                txt.setText("Here is your private key. KEEP IT SAFE!\n" + privkeySTR.decode("utf-8"))
+                txt.setText("Here is your private key. KEEP IT SAFE!\n" + keySTR.decode("utf-8"))
                 btn = QPushButton("Noted", d)
                 btn.setToolTip('Make sure, I will not show it again')
                 btn.resize(200, 30)
                 btn.move(50, 260)
                 btn.clicked.connect(d.accept)
                 btn2 = QPushButton("Just save it", d)
-                btn2.setToolTip('NO! IT"S NOT SAFE!!!')
+                btn2.setToolTip('To file?')
+                btn2.resize(200, 30)
+                btn2.move(50, 300)
+                btn2.clicked.connect(saveKey)
+                d.exec_()
+        
+        def signSeed():
+            errorFlag = False
+            
+            def getSeed():
+                try:
+                    seed = str(openFile("Open seed")).encode('utf-8')
+                except:
+                    errorFlag = True
+                    errorDialog("No file chosen for opening")
+
+            try:
+                file = str(openFile()).encode('utf-8')
+            except:
+                errorFlag = True
+                errorDialog("No file chosen for opening")
+            if(not errorFlag):
+                keys = RSA.generate(2048, getSeed())
+                pubkey = keys.publickey()
+                hash = SHA3_224.new(file)
+                cipher = pss.new(keys).sign(hash)
+                print(hash.hexdigest())
+                print(cipher)
+                try:
+                    saveFileBin(cipher, "Save signature")
+                except:
+                    errorFlag = True
+                    errorDialog("File saving aborted by user")
+                keySTR = pubkey.export_key(format='PEM', passphrase=None, pkcs=1, protection=None, randfunc=None)
+
+                def saveKey():
+                    filename = QFileDialog.getSaveFileName(self, "Save key file", "", ".PEM")
+                    try:
+                        if not filename[0]: raise IOError("No file selected")
+                        f = open(filename[0], 'wb')
+                        f.write(keySTR)
+                        f.close()
+                    except:
+                        errorFlag = True
+                        errorDialog("File saving aborted by user")
+            
+            if(not errorFlag):
+                d = QDialog()
+                d.setWindowTitle("Done")
+                d.resize(300, 340)
+                txt = QTextEdit(d)
+                txt.resize(280, 240)
+                txt.move(10, 10)
+                txt.setReadOnly(True)
+                txt.setText("Here is your private key. KEEP IT SAFE!\n" + keySTR.decode("utf-8"))
+                btn = QPushButton("Noted", d)
+                btn.setToolTip('Make sure, I will not show it again')
+                btn.resize(200, 30)
+                btn.move(50, 260)
+                btn.clicked.connect(d.accept)
+                btn2 = QPushButton("Just save it", d)
+                btn2.setToolTip('To file?')
                 btn2.resize(200, 30)
                 btn2.move(50, 300)
                 btn2.clicked.connect(saveKey)
@@ -159,13 +215,13 @@ class App(QMainWindow):
                 errorDialog("No file chosen for opening")
                 return
             try:
-                privKey = openFileBin("Open key file").read()
+                Key = RSA.import_key(openFileBin("Open key file").read())
             except:
                 errorFlag = True
                 errorDialog("No file chosen for opening")
                 return
             if(not errorFlag):
-                if(check(file, signature, privKey)):
+                if(check(file, signature, Key)):
                     d2 = QDialog()
                     d2.setWindowTitle("Checked")
                     d2.resize(200, 100)
@@ -194,22 +250,28 @@ class App(QMainWindow):
                     btn2.clicked.connect(d2.accept)
                     d2.exec_()
 
-        buttonNewFile = QPushButton('Sign', self)
+        buttonNewFile = QPushButton('Sign with random key', self)
         buttonNewFile.setToolTip('Sign new file')
         buttonNewFile.resize(200, 30)
         buttonNewFile.move(50, 20)
         buttonNewFile.clicked.connect(sign)
 
+        buttonNewFile = QPushButton('Sign with key from seed', self)
+        buttonNewFile.setToolTip('Sign new file with own key')
+        buttonNewFile.resize(200, 30)
+        buttonNewFile.move(50, 60)
+        buttonNewFile.clicked.connect(signSeed)
+
         buttonOpenFile = QPushButton('Validate', self)
         buttonOpenFile.setToolTip('Validate file with existing signature')
         buttonOpenFile.resize(200, 30)
-        buttonOpenFile.move(50, 60)
+        buttonOpenFile.move(50, 100)
         buttonOpenFile.clicked.connect(validate)
 
         buttonExit = QPushButton('Exit', self)
         buttonExit.setToolTip('Do I need to explain this functionality?')
         buttonExit.resize(200, 30)
-        buttonExit.move(50, 100)
+        buttonExit.move(50, 140)
         buttonExit.clicked.connect(self.close)
 
         self.show()

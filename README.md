@@ -13,7 +13,10 @@ Options for both signing and validation are present in GUI menu.
 3. Save signature file in choosen destination
 4. Program will output private key which can be copied or save directly to .PEM file. Private key is being shown only at this stage - THERE IS NO WAY TO RECOVER IT LATER
 
+Secondary option prompts user for seed used to generate RSA keys.
+
 ## Validation
+
 1. Select file that was signed
 2. Select coresponding signature file
 3. Select .PEM file containing RSA private key
@@ -24,4 +27,4 @@ Options for both signing and validation are present in GUI menu.
 - ~~Program will crash if no/invalid file will be selected. Exceptions handling will be added in future (if I won't be too lazy).~~
 - Program was checked with text and PDF files. Hash can be computed for any input so it should work with any type of file. Howerer it is not guaranteed.
 - Program was tested under Win 10/11, MacOS 12 and Ubuntu 18 and runs fine (as long as dependencies are satisfied).
-- Private key is being exported/imported in PEM format. Results such us signature and PEM key are saved as bytes.
+- Private key is being exported/imported in PEM format. Results such as signature and PEM key are saved as bytes.
